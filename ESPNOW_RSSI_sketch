@@ -1,0 +1,103 @@
+import board
+import digitalio
+import time
+import espnow  # hypothetically
+import wifi
+
+# ==========================
+# ===== USER SETTINGS ======
+# ==========================
+
+DEVICE_NAME = "EliBadge"
+MY_BADGES = ["robotics", "climbing", "ai", "me"]
+ALERT_PIN = board.D2
+RSSI_THRESHOLD = -65  # hypothetical RSSI filter
+
+# ==========================
+# ===== LED SETUP ==========
+# ==========================
+
+led = digitalio.DigitalInOut(ALERT_PIN)
+led.direction = digitalio.Direction.OUTPUT
+
+# ==========================
+# ===== WiFi / ESP-NOW =====
+# ==========================
+
+wifi.radio.connect("SSID", "PASSWORD")  # just placeholder
+e = espnow.ESPNow()  # hypothetically like MicroPython
+e.active(True)
+
+broadcast = b'\xff\xff\xff\xff\xff\xff'
+e.add_peer(broadcast)
+
+# ==========================
+# ===== STATE TRACKING =====
+# ==========================
+
+seen_devices = set()
+my_mac = wifi.radio.mac_address
+
+# ==========================
+# ===== HELPER FUNCTIONS ===
+# ==========================
+
+def find_matches(my_list, other_list):
+    return list(set(my_list) & set(other_list))
+
+def mac_to_str(mac):
+    return ':'.join('{:02X}'.format(b) for b in mac)
+
+# ==========================
+# ===== MAIN LOOP ==========
+# ==========================
+
+while True:
+
+    # --- Broadcast ---
+    payload = {
+        "name": DEVICE_NAME,
+        "badges": MY_BADGES
+    }
+
+    e.send(broadcast, str(payload))  # hypothetically send
+
+    # --- Receive ---
+    host, msg = e.recv(1000)  # wait 1 sec
+
+    if msg:
+        # Ignore self
+        if host == my_mac:
+            continue
+
+        # Hypothetical RSSI
+        try:
+            rssi = e.peers_table[host][0]
+        except:
+            rssi = None
+
+        if rssi is None or rssi < RSSI_THRESHOLD:
+            continue
+
+        # Parse message (assume dict)
+        try:
+            received = eval(msg)  # placeholder for dict parsing
+        except:
+            continue
+
+        other_name = received.get("name", "Unknown")
+        other_badges = received.get("badges", [])
+
+        matches = find_matches(MY_BADGES, other_badges)
+
+        if len(matches) > 0 and host not in seen_devices:
+            print("ALERT! Shared badges with", other_name)
+            print("Shared badges:", matches)
+
+            led.value = True
+            time.sleep(0.5)
+            led.value = False
+
+            seen_devices.add(host)
+
+    time.sleep(2)
