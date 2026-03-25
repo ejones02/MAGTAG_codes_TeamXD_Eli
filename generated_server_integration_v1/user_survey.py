@@ -25,7 +25,14 @@ def html_escape(text):
 
 
 def toml_escape(text):
-    return (text or "").replace("\\", "\\\\").replace('"', '\\"')
+    # TOML basic strings cannot contain raw newlines; escape them explicitly.
+    return (
+        (text or "")
+        .replace("\\", "\\\\")
+        .replace('"', '\\"')
+        .replace("\r", "\\r")
+        .replace("\n", "\\n")
+    )
 
 
 def url_decode(text):
